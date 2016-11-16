@@ -219,6 +219,7 @@ pub fn run(config: Rc<Config>, handle: Handle) -> Box<Future<Item = (), Error = 
             let server_cfg = servers.pick_server();
             trace!("Got connection, addr: {}", addr);
             trace!("Picked proxy server: {:?}", server_cfg);
+            try!(socket.set_nodelay(true));
             handle_socks5_client(&handle, socket, server_cfg, udp_conf.clone())
         });
 

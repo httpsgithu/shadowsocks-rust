@@ -76,7 +76,12 @@ pub type EncryptedHalfFut = BoxIoFuture<EncryptedHalf>;
 
 fn connect_proxy_server(handle: &Handle, svr_cfg: Rc<ServerConfig>) -> BoxIoFuture<TcpStream> {
     match svr_cfg.addr() {
-        &ServerAddr::SocketAddr(ref addr) => TcpStream::connect(addr, handle).boxed(),
+        &ServerAddr::SocketAddr(ref addr) => {
+            boxed_future(TcpStream::connect(addr, handle).and_then(|s| {
+                try!(s.set_nodelay(true));
+                Ok(s)
+            }))
+        }
         &ServerAddr::DomainName(ref domain, port) => {
             let handle = handle.clone();
             let fut = DnsResolver::resolve(&domain[..]).and_then(move |sockaddr| {
@@ -84,7 +89,10 @@ fn connect_proxy_server(handle: &Handle, svr_cfg: Rc<ServerConfig>) -> BoxIoFutu
                     IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(v4, port)),
                     IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, port, 0, 0)),
                 };
-                TcpStream::connect(&sockaddr, &handle)
+                TcpStream::connect(&sockaddr, &handle).and_then(|s| {
+                    try!(s.set_nodelay(true));
+                    Ok(s)
+                })
             });
             Box::new(fut)
         }

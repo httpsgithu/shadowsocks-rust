@@ -126,7 +126,11 @@ impl TcpRelayClientPending {
     fn connect_remote(handle: Handle, addr: Address, forbidden_ip: Rc<HashSet<IpAddr>>) -> BoxIoFuture<TcpStream> {
         info!("Connecting to remote {}", addr);
         Box::new(TcpRelayClientPending::resolve_remote(addr, forbidden_ip)
-            .and_then(move |addr| TcpStream::connect(&addr, &handle)))
+            .and_then(move |addr| TcpStream::connect(&addr, &handle))
+            .and_then(|s| {
+                try!(s.set_nodelay(true));
+                Ok(s)
+            }))
     }
 
     /// Connect to the remote server
@@ -203,6 +207,8 @@ pub fn run(config: Rc<Config>, handle: Handle) -> Box<Future<Item = (), Error = 
 
                 trace!("Got connection, addr: {}", addr);
                 trace!("Picked proxy server: {:?}", server_cfg);
+
+                try!(socket.set_nodelay(true));
 
                 let client = TcpRelayClientHandshake {
                     handle: handle.clone(),
