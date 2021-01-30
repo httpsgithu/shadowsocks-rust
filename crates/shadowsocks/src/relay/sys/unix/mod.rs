@@ -172,7 +172,13 @@ pub async fn create_outbound_udp_socket(af: AddrFamily, config: &ConnectOpts) ->
     #[cfg(target_os = "android")]
     {
         if let Some(ref path) = config.vpn_protect_path {
-            protect(path, socket.as_raw_fd()).await?;
+            // RPC calls to `VpnService.protect()`
+            // Timeout in 3 seconds like shadowsocks-libev
+            match time::timeout(Duration::from_secs(3), protect(path, socket.as_raw_fd())).await {
+                Ok(Ok(..)) => {}
+                Ok(Err(err)) => return Err(err),
+                Err(..) => return Err(Error::new(ErrorKind::TimedOut, "protect() timeout")),
+            }
         }
     }
 
